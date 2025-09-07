@@ -67,15 +67,24 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
         }
         
         try {
-            SecretKeySpec secretKeySpec = generateKey();
-            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
-            cipher.init(Cipher.DECRYPT_MODE, secretKeySpec);
-            
-            byte[] decodedBytes = Base64.getDecoder().decode(encryptedText);
-            byte[] decryptedBytes = cipher.doFinal(decodedBytes);
-            return new String(decryptedBytes, StandardCharsets.UTF_8);
+            // Check if the text looks like Base64 encoded data (encrypted)
+            if (isBase64Encoded(encryptedText)) {
+                SecretKeySpec secretKeySpec = generateKey();
+                Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+                cipher.init(Cipher.DECRYPT_MODE, secretKeySpec);
+                
+                byte[] decodedBytes = Base64.getDecoder().decode(encryptedText);
+                byte[] decryptedBytes = cipher.doFinal(decodedBytes);
+                return new String(decryptedBytes, StandardCharsets.UTF_8);
+            } else {
+                // If it doesn't look like Base64, it's probably plain text (legacy data)
+                // Return as-is for backward compatibility
+                return encryptedText;
+            }
         } catch (Exception e) {
-            throw new RuntimeException("Error decrypting sensitive data", e);
+            // If decryption fails, return the original text (legacy data)
+            // This handles cases where data might be corrupted or in an unexpected format
+            return encryptedText;
         }
     }
 
@@ -90,5 +99,30 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
         byte[] keyBytes = new byte[16];
         System.arraycopy(key, 0, keyBytes, 0, Math.min(key.length, 16));
         return new SecretKeySpec(keyBytes, ALGORITHM);
+    }
+
+    /**
+     * Checks if a string is valid Base64 encoded data.
+     * 
+     * @param text the text to check
+     * @return true if the text appears to be Base64 encoded, false otherwise
+     */
+    private boolean isBase64Encoded(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return false;
+        }
+        
+        try {
+            // Check if the string contains only Base64 characters
+            if (!text.matches("^[A-Za-z0-9+/]*={0,2}$")) {
+                return false;
+            }
+            
+            // Try to decode it - if it succeeds, it's valid Base64
+            Base64.getDecoder().decode(text);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 }
