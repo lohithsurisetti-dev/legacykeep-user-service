@@ -5,10 +5,12 @@ import com.legacykeep.user.entity.UserActivityLog;
 import com.legacykeep.user.entity.UserInterest;
 import com.legacykeep.user.entity.UserPreferences;
 import com.legacykeep.user.entity.UserProfile;
+import com.legacykeep.user.entity.UserSettings;
 import com.legacykeep.user.repository.UserActivityLogRepository;
 import com.legacykeep.user.repository.UserInterestRepository;
 import com.legacykeep.user.repository.UserPreferencesRepository;
 import com.legacykeep.user.repository.UserProfileRepository;
+import com.legacykeep.user.repository.UserSettingsRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +43,7 @@ public class UserSearchController {
     private final UserPreferencesRepository userPreferencesRepository;
     private final UserInterestRepository userInterestRepository;
     private final UserActivityLogRepository userActivityLogRepository;
+    private final UserSettingsRepository userSettingsRepository;
 
     /**
      * Get service health status.
@@ -139,6 +142,9 @@ public class UserSearchController {
             // Get user preferences
             Optional<UserPreferences> preferencesOpt = userPreferencesRepository.findByUserId(userId);
             
+            // Get user settings
+            Optional<UserSettings> settingsOpt = userSettingsRepository.findByUserId(userId);
+            
             // Get user interests
             List<UserInterest> interests = userInterestRepository.findByUserId(userId);
             
@@ -152,6 +158,7 @@ public class UserSearchController {
             var dashboardData = Map.<String, Object>of(
                 "profile", profileOpt.get(),
                 "preferences", preferencesOpt.orElse(null),
+                "settings", settingsOpt.orElse(null),
                 "interests", interests,
                 "recentActivity", recentActivity,
                 "timestamp", LocalDateTime.now().toString()
@@ -176,7 +183,7 @@ public class UserSearchController {
         try {
             long totalProfiles = userProfileRepository.count();
             long totalPreferences = userPreferencesRepository.count();
-            long totalSettings = 0L; // UserSettingsRepository not implemented yet
+            long totalSettings = userSettingsRepository.count();
             long totalInterests = userInterestRepository.count();
             long totalActivityLogs = userActivityLogRepository.count();
             
@@ -199,4 +206,5 @@ public class UserSearchController {
         }
     }
 }
+
 
