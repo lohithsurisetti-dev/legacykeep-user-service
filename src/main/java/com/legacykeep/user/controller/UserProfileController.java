@@ -1,53 +1,62 @@
 package com.legacykeep.user.controller;
 
 import com.legacykeep.user.dto.ApiResponse;
-import com.legacykeep.user.entity.UserProfile;
-import com.legacykeep.user.repository.UserProfileRepository;
+import com.legacykeep.user.dto.request.UserProfileRequestDto;
+import com.legacykeep.user.dto.response.UserProfileResponseDto;
+import com.legacykeep.user.service.JwtValidationService;
+import com.legacykeep.user.service.UserProfileService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
 import java.util.Optional;
 
 /**
  * REST Controller for User Profile operations.
  * 
- * Handles all user profile related endpoints.
+ * Handles all user profile related endpoints with proper authentication
+ * and service layer integration.
  * 
  * @author LegacyKeep Team
  * @version 1.0.0
  */
 @RestController
-@RequestMapping("/profiles")
+@RequestMapping("/api/v1/profiles")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "User Profile Management", description = "APIs for managing user profiles")
+@SecurityRequirement(name = "bearerAuth")
 public class UserProfileController {
 
-    private final UserProfileRepository userProfileRepository;
+    private final UserProfileService userProfileService;
+    private final JwtValidationService jwtValidationService;
 
     /**
-     * Get all user profiles.
+     * Get current user's profile.
      */
-    @GetMapping
-    @Operation(summary = "Get all profiles", description = "Retrieve all user profiles")
-    public ResponseEntity<ApiResponse<List<UserProfile>>> getAllProfiles() {
-        log.info("Retrieving all user profiles");
+    @GetMapping("/me")
+    @Operation(summary = "Get my profile", description = "Retrieve current user's profile")
+    public ResponseEntity<ApiResponse<UserProfileResponseDto>> getMyProfile(
+            @RequestHeader("Authorization") String authHeader) {
+        log.info("Retrieving current user's profile");
         
-        try {
-            List<UserProfile> profiles = userProfileRepository.findAll();
-            return ResponseEntity.ok(ApiResponse.success(profiles, "Profiles retrieved successfully"));
-        } catch (Exception e) {
-            log.error("Error retrieving profiles", e);
-            return ResponseEntity.status(500)
-                .body(ApiResponse.error("Failed to retrieve profiles: " + e.getMessage()));
+        Long userId = extractUserIdFromToken(authHeader);
+        Optional<UserProfileResponseDto> profile = userProfileService.getProfileByUserId(userId);
+        
+        if (profile.isEmpty()) {
+            return ResponseEntity.status(404)
+                .body(ApiResponse.error("Profile not found"));
         }
+        
+        return ResponseEntity.ok(ApiResponse.success(profile.get(), "Profile retrieved successfully"));
     }
 
     /**
@@ -55,45 +64,16 @@ public class UserProfileController {
      */
     @GetMapping("/{profileId}")
     @Operation(summary = "Get profile by ID", description = "Retrieve user profile by ID")
-    public ResponseEntity<ApiResponse<UserProfile>> getProfileById(@PathVariable Long profileId) {
+    public ResponseEntity<ApiResponse<UserProfileResponseDto>> getProfileById(@PathVariable("profileId") Long profileId) {
         log.info("Retrieving profile with ID: {}", profileId);
         
-        try {
-            Optional<UserProfile> profileOpt = userProfileRepository.findById(profileId);
-            if (profileOpt.isEmpty()) {
-                return ResponseEntity.status(404)
-                    .body(ApiResponse.error("Profile not found with ID: " + profileId));
-            }
-            
-            return ResponseEntity.ok(ApiResponse.success(profileOpt.get(), "Profile retrieved successfully"));
-        } catch (Exception e) {
-            log.error("Error retrieving profile with ID: {}", profileId, e);
-            return ResponseEntity.status(500)
-                .body(ApiResponse.error("Failed to retrieve profile: " + e.getMessage()));
+        Optional<UserProfileResponseDto> profile = userProfileService.getProfileById(profileId);
+        if (profile.isEmpty()) {
+            return ResponseEntity.status(404)
+                .body(ApiResponse.error("Profile not found with ID: " + profileId));
         }
-    }
-
-    /**
-     * Get user profile by user ID.
-     */
-    @GetMapping("/user/{userId}")
-    @Operation(summary = "Get profile by user ID", description = "Retrieve user profile by user ID")
-    public ResponseEntity<ApiResponse<UserProfile>> getProfileByUserId(@PathVariable Long userId) {
-        log.info("Retrieving profile for user ID: {}", userId);
         
-        try {
-            Optional<UserProfile> profileOpt = userProfileRepository.findByUserId(userId);
-            if (profileOpt.isEmpty()) {
-                return ResponseEntity.status(404)
-                    .body(ApiResponse.error("Profile not found for user ID: " + userId));
-            }
-            
-            return ResponseEntity.ok(ApiResponse.success(profileOpt.get(), "Profile retrieved successfully"));
-        } catch (Exception e) {
-            log.error("Error retrieving profile for user ID: {}", userId, e);
-            return ResponseEntity.status(500)
-                .body(ApiResponse.error("Failed to retrieve profile: " + e.getMessage()));
-        }
+        return ResponseEntity.ok(ApiResponse.success(profile.get(), "Profile retrieved successfully"));
     }
 
     /**
@@ -101,160 +81,149 @@ public class UserProfileController {
      */
     @PostMapping
     @Operation(summary = "Create user profile", description = "Create a new user profile")
-    public ResponseEntity<ApiResponse<UserProfile>> createProfile(@RequestBody UserProfile profile) {
-        log.info("Creating new user profile for user ID: {}", profile.getUserId());
+    public ResponseEntity<ApiResponse<UserProfileResponseDto>> createProfile(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody UserProfileRequestDto requestDto) {
+        log.info("Creating new user profile");
         
-        try {
-            // Check if profile already exists for this user
-            Optional<UserProfile> existingProfile = userProfileRepository.findByUserId(profile.getUserId());
-            if (existingProfile.isPresent()) {
-                return ResponseEntity.status(409)
-                    .body(ApiResponse.error("Profile already exists for user ID: " + profile.getUserId()));
-            }
-            
-            // Set timestamps
-            profile.setCreatedAt(LocalDateTime.now());
-            profile.setUpdatedAt(LocalDateTime.now());
-            
-            UserProfile savedProfile = userProfileRepository.save(profile);
-            
-            log.info("Profile created successfully with ID: {}", savedProfile.getId());
-            return ResponseEntity.status(201)
-                .body(ApiResponse.success(savedProfile, "Profile created successfully"));
-        } catch (Exception e) {
-            log.error("Error creating profile for user ID: {}", profile.getUserId(), e);
-            return ResponseEntity.status(500)
-                .body(ApiResponse.error("Failed to create profile: " + e.getMessage()));
-        }
+        Long userId = extractUserIdFromToken(authHeader);
+        UserProfileResponseDto profile = userProfileService.createProfile(userId, requestDto);
+        
+        return ResponseEntity.status(201)
+            .body(ApiResponse.success(profile, "Profile created successfully"));
     }
 
     /**
-     * Update user profile.
+     * Update current user's profile.
      */
-    @PutMapping("/{profileId}")
-    @Operation(summary = "Update user profile", description = "Update an existing user profile")
-    public ResponseEntity<ApiResponse<UserProfile>> updateProfile(
-            @PathVariable Long profileId, 
-            @RequestBody UserProfile updatedProfile) {
-        log.info("Updating profile with ID: {}", profileId);
+    @PutMapping("/me")
+    @Operation(summary = "Update my profile", description = "Update current user's profile")
+    public ResponseEntity<ApiResponse<UserProfileResponseDto>> updateMyProfile(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody UserProfileRequestDto requestDto) {
+        log.info("Updating current user's profile");
         
-        try {
-            Optional<UserProfile> existingProfileOpt = userProfileRepository.findById(profileId);
-            if (existingProfileOpt.isEmpty()) {
-                return ResponseEntity.status(404)
-                    .body(ApiResponse.error("Profile not found with ID: " + profileId));
-            }
-            
-            UserProfile existingProfile = existingProfileOpt.get();
-            
-            // Update fields (preserve ID and timestamps)
-            existingProfile.setFirstName(updatedProfile.getFirstName());
-            existingProfile.setLastName(updatedProfile.getLastName());
-            existingProfile.setDisplayName(updatedProfile.getDisplayName());
-            existingProfile.setBio(updatedProfile.getBio());
-            existingProfile.setDateOfBirth(updatedProfile.getDateOfBirth());
-            existingProfile.setPhoneNumber(updatedProfile.getPhoneNumber());
-            existingProfile.setAddressLine1(updatedProfile.getAddressLine1());
-            existingProfile.setAddressLine2(updatedProfile.getAddressLine2());
-            existingProfile.setCity(updatedProfile.getCity());
-            existingProfile.setState(updatedProfile.getState());
-            existingProfile.setCountry(updatedProfile.getCountry());
-            existingProfile.setPostalCode(updatedProfile.getPostalCode());
-            existingProfile.setTimezone(updatedProfile.getTimezone());
-            existingProfile.setLanguage(updatedProfile.getLanguage());
-            existingProfile.setProfilePictureUrl(updatedProfile.getProfilePictureUrl());
-            existingProfile.setProfilePictureThumbnailUrl(updatedProfile.getProfilePictureThumbnailUrl());
-            existingProfile.setPublic(updatedProfile.isPublic());
-            existingProfile.setUpdatedAt(LocalDateTime.now());
-            
-            UserProfile savedProfile = userProfileRepository.save(existingProfile);
-            
-            log.info("Profile updated successfully with ID: {}", savedProfile.getId());
-            return ResponseEntity.ok(ApiResponse.success(savedProfile, "Profile updated successfully"));
-        } catch (Exception e) {
-            log.error("Error updating profile with ID: {}", profileId, e);
-            return ResponseEntity.status(500)
-                .body(ApiResponse.error("Failed to update profile: " + e.getMessage()));
-        }
+        Long userId = extractUserIdFromToken(authHeader);
+        UserProfileResponseDto profile = userProfileService.updateProfile(userId, requestDto);
+        
+        return ResponseEntity.ok(ApiResponse.success(profile, "Profile updated successfully"));
     }
 
     /**
-     * Delete user profile.
+     * Delete current user's profile.
      */
-    @DeleteMapping("/{profileId}")
-    @Operation(summary = "Delete user profile", description = "Delete a user profile")
-    public ResponseEntity<ApiResponse<Void>> deleteProfile(@PathVariable Long profileId) {
-        log.info("Deleting profile with ID: {}", profileId);
+    @DeleteMapping("/me")
+    @Operation(summary = "Delete my profile", description = "Delete current user's profile")
+    public ResponseEntity<ApiResponse<Void>> deleteMyProfile(
+            @RequestHeader("Authorization") String authHeader) {
+        log.info("Deleting current user's profile");
         
-        try {
-            Optional<UserProfile> profileOpt = userProfileRepository.findById(profileId);
-            if (profileOpt.isEmpty()) {
-                return ResponseEntity.status(404)
-                    .body(ApiResponse.error("Profile not found with ID: " + profileId));
-            }
-            
-            userProfileRepository.deleteById(profileId);
-            
-            log.info("Profile deleted successfully with ID: {}", profileId);
-            return ResponseEntity.ok(ApiResponse.success(null, "Profile deleted successfully"));
-        } catch (Exception e) {
-            log.error("Error deleting profile with ID: {}", profileId, e);
-            return ResponseEntity.status(500)
-                .body(ApiResponse.error("Failed to delete profile: " + e.getMessage()));
-        }
+        Long userId = extractUserIdFromToken(authHeader);
+        userProfileService.deleteProfile(userId);
+        
+        return ResponseEntity.ok(ApiResponse.success(null, "Profile deleted successfully"));
     }
 
     /**
-     * Get public profiles only.
+     * Get public profiles with pagination.
      */
     @GetMapping("/public")
-    @Operation(summary = "Get public profiles", description = "Retrieve only public user profiles")
-    public ResponseEntity<ApiResponse<List<UserProfile>>> getPublicProfiles(
-            @RequestParam(defaultValue = "20") int limit) {
-        log.info("Retrieving public profiles with limit: {}", limit);
+    @Operation(summary = "Get public profiles", description = "Retrieve public user profiles with pagination")
+    public ResponseEntity<ApiResponse<Page<UserProfileResponseDto>>> getPublicProfiles(
+            Pageable pageable) {
+        log.info("Retrieving public profiles with pagination: {}", pageable);
         
-        try {
-            List<UserProfile> profiles = userProfileRepository.findAll()
-                .stream()
-                .filter(UserProfile::isPublic)
-                .limit(limit)
-                .toList();
-            
-            return ResponseEntity.ok(ApiResponse.success(profiles, "Public profiles retrieved successfully"));
-        } catch (Exception e) {
-            log.error("Error retrieving public profiles", e);
-            return ResponseEntity.status(500)
-                .body(ApiResponse.error("Failed to retrieve public profiles: " + e.getMessage()));
-        }
+        Page<UserProfileResponseDto> profiles = userProfileService.getPublicProfiles(pageable);
+        return ResponseEntity.ok(ApiResponse.success(profiles, "Public profiles retrieved successfully"));
     }
 
     /**
-     * Create a test profile.
+     * Search profiles by name or display name.
      */
-    @PostMapping("/create-test")
-    @Operation(summary = "Create test profile", description = "Create a simple test profile")
-    public ResponseEntity<ApiResponse<UserProfile>> createTestProfile() {
-        log.info("Creating test profile");
+    @GetMapping("/search")
+    @Operation(summary = "Search profiles", description = "Search profiles by name or display name")
+    public ResponseEntity<ApiResponse<Page<UserProfileResponseDto>>> searchProfiles(
+            @RequestParam("query") String query,
+            Pageable pageable) {
+        log.info("Searching profiles with query: {}", query);
         
-        try {
-            UserProfile profile = new UserProfile();
-            profile.setUserId(999L); // Test user ID
-            profile.setFirstName("Test");
-            profile.setLastName("User");
-            profile.setDisplayName("Test User");
-            profile.setBio("This is a test profile");
-            profile.setCreatedAt(LocalDateTime.now());
-            profile.setUpdatedAt(LocalDateTime.now());
-            
-            UserProfile savedProfile = userProfileRepository.save(profile);
-            
-            log.info("Test profile created with ID: {}", savedProfile.getId());
-            return ResponseEntity.status(201)
-                .body(ApiResponse.success(savedProfile, "Test profile created successfully"));
-        } catch (Exception e) {
-            log.error("Error creating test profile", e);
-            return ResponseEntity.status(500)
-                .body(ApiResponse.error("Failed to create test profile: " + e.getMessage()));
+        Page<UserProfileResponseDto> profiles = userProfileService.searchProfiles(query, pageable);
+        return ResponseEntity.ok(ApiResponse.success(profiles, "Search results retrieved successfully"));
+    }
+
+    /**
+     * Upload profile picture.
+     */
+    @PostMapping("/me/picture")
+    @Operation(summary = "Upload profile picture", description = "Upload a new profile picture")
+    public ResponseEntity<ApiResponse<UserProfileResponseDto>> uploadProfilePicture(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam("file") MultipartFile file) {
+        log.info("Uploading profile picture");
+        
+        Long userId = extractUserIdFromToken(authHeader);
+        
+        if (file.isEmpty()) {
+            return ResponseEntity.status(400)
+                .body(ApiResponse.error("File is empty"));
         }
+        
+        UserProfileResponseDto profile;
+        try {
+            profile = userProfileService.uploadProfilePicture(
+                userId, file.getBytes(), file.getContentType());
+        } catch (IOException e) {
+            return ResponseEntity.status(500)
+                .body(ApiResponse.error("Failed to process file: " + e.getMessage()));
+        }
+        
+        return ResponseEntity.ok(ApiResponse.success(profile, "Profile picture uploaded successfully"));
+    }
+
+    /**
+     * Delete profile picture.
+     */
+    @DeleteMapping("/me/picture")
+    @Operation(summary = "Delete profile picture", description = "Delete current user's profile picture")
+    public ResponseEntity<ApiResponse<UserProfileResponseDto>> deleteProfilePicture(
+            @RequestHeader("Authorization") String authHeader) {
+        log.info("Deleting profile picture");
+        
+        Long userId = extractUserIdFromToken(authHeader);
+        UserProfileResponseDto profile = userProfileService.deleteProfilePicture(userId);
+        
+        return ResponseEntity.ok(ApiResponse.success(profile, "Profile picture deleted successfully"));
+    }
+
+    /**
+     * Get profile completion percentage.
+     */
+    @GetMapping("/me/completion")
+    @Operation(summary = "Get profile completion", description = "Get profile completion percentage")
+    public ResponseEntity<ApiResponse<Integer>> getProfileCompletion(
+            @RequestHeader("Authorization") String authHeader) {
+        log.info("Getting profile completion percentage");
+        
+        Long userId = extractUserIdFromToken(authHeader);
+        int completion = userProfileService.getProfileCompletionPercentage(userId);
+        
+        return ResponseEntity.ok(ApiResponse.success(completion, "Profile completion retrieved successfully"));
+    }
+
+    // =============================================================================
+    // Private Helper Methods
+    // =============================================================================
+
+    /**
+     * Extract user ID from JWT token in Authorization header.
+     */
+    private Long extractUserIdFromToken(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new IllegalArgumentException("Invalid authorization header");
+        }
+        
+        String token = authHeader.substring(7);
+        return jwtValidationService.extractUserId(token)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired token"));
     }
 }

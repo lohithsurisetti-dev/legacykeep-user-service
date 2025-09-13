@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Standard API response wrapper for all User Service endpoints.
@@ -162,6 +163,23 @@ public class ApiResponse<T> {
                 .message(message)
                 .errors(errors)
                 .metadata(metadata)
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+    /**
+     * Create an error response with message and validation errors map.
+     * 
+     * @param message the error message
+     * @param validationErrors map of field names to error messages
+     * @param <T> the data type
+     * @return error API response
+     */
+    public static <T> ApiResponse<T> error(String message, Map<String, String> validationErrors) {
+        return ApiResponse.<T>builder()
+                .success(false)
+                .message(message)
+                .metadata(validationErrors)
                 .timestamp(LocalDateTime.now())
                 .build();
     }
