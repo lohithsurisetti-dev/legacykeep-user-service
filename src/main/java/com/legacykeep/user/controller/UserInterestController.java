@@ -3,6 +3,7 @@ package com.legacykeep.user.controller;
 import com.legacykeep.user.dto.ApiResponse;
 import com.legacykeep.user.entity.UserInterest;
 import com.legacykeep.user.repository.UserInterestRepository;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -72,7 +73,7 @@ public class UserInterestController {
      */
     @PostMapping
     @Operation(summary = "Add user interest", description = "Add a new interest for a user")
-    public ResponseEntity<ApiResponse<UserInterest>> addInterest(@RequestBody UserInterest interest) {
+    public ResponseEntity<ApiResponse<UserInterest>> addInterest(@Valid @RequestBody UserInterest interest) {
         log.info("Adding interest for user ID: {}", interest.getUserId());
         
         try {
@@ -107,7 +108,7 @@ public class UserInterestController {
     @Operation(summary = "Update user interest", description = "Update an existing user interest")
     public ResponseEntity<ApiResponse<UserInterest>> updateInterest(
             @PathVariable Long interestId, 
-            @RequestBody UserInterest updatedInterest) {
+            @Valid @RequestBody UserInterest updatedInterest) {
         log.info("Updating interest with ID: {}", interestId);
         
         try {

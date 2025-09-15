@@ -3,6 +3,7 @@ package com.legacykeep.user.controller;
 import com.legacykeep.user.dto.ApiResponse;
 import com.legacykeep.user.entity.UserSettings;
 import com.legacykeep.user.repository.UserSettingsRepository;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -78,7 +79,7 @@ public class UserSettingsController {
      */
     @PostMapping
     @Operation(summary = "Create user settings", description = "Create new user settings")
-    public ResponseEntity<ApiResponse<UserSettings>> createSettings(@RequestBody UserSettings settings) {
+    public ResponseEntity<ApiResponse<UserSettings>> createSettings(@Valid @RequestBody UserSettings settings) {
         log.info("Creating settings for user ID: {}", settings.getUserId());
         
         try {
@@ -112,7 +113,7 @@ public class UserSettingsController {
     @Operation(summary = "Update user settings", description = "Update existing user settings")
     public ResponseEntity<ApiResponse<UserSettings>> updateSettings(
             @PathVariable Long settingsId, 
-            @RequestBody UserSettings updatedSettings) {
+            @Valid @RequestBody UserSettings updatedSettings) {
         log.info("Updating settings with ID: {}", settingsId);
         
         try {

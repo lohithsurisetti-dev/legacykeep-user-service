@@ -5,6 +5,7 @@ import com.legacykeep.user.dto.request.UserProfileRequestDto;
 import com.legacykeep.user.dto.response.UserProfileResponseDto;
 import com.legacykeep.user.service.JwtValidationService;
 import com.legacykeep.user.service.UserProfileService;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -83,7 +84,7 @@ public class UserProfileController {
     @Operation(summary = "Create user profile", description = "Create a new user profile")
     public ResponseEntity<ApiResponse<UserProfileResponseDto>> createProfile(
             @RequestHeader("Authorization") String authHeader,
-            @RequestBody UserProfileRequestDto requestDto) {
+            @Valid @RequestBody UserProfileRequestDto requestDto) {
         log.info("Creating new user profile");
         
         Long userId = extractUserIdFromToken(authHeader);
@@ -100,7 +101,7 @@ public class UserProfileController {
     @Operation(summary = "Update my profile", description = "Update current user's profile")
     public ResponseEntity<ApiResponse<UserProfileResponseDto>> updateMyProfile(
             @RequestHeader("Authorization") String authHeader,
-            @RequestBody UserProfileRequestDto requestDto) {
+            @Valid @RequestBody UserProfileRequestDto requestDto) {
         log.info("Updating current user's profile");
         
         Long userId = extractUserIdFromToken(authHeader);
