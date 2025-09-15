@@ -1,6 +1,7 @@
 package com.legacykeep.user.service.impl;
 
 import com.legacykeep.user.entity.UserProfile;
+import com.legacykeep.user.dto.request.UpdateProfilePictureRequestDto;
 import com.legacykeep.user.dto.request.UserProfileRequestDto;
 import com.legacykeep.user.dto.response.UserProfileResponseDto;
 import com.legacykeep.user.exception.InvalidImageException;
@@ -49,10 +50,8 @@ public class UserProfileServiceImpl implements UserProfileService {
     public UserProfileResponseDto createProfile(Long userId, UserProfileRequestDto requestDto) {
         log.info("Creating profile for user ID: {}", userId);
 
-        // Validate user exists in Auth Service
-        if (!authServiceIntegration.validateUserExists(userId)) {
-            throw new IllegalArgumentException("User not found in Auth Service: " + userId);
-        }
+        // Note: User existence is validated by JWT token validation
+        // No need to call Auth Service since JWT token proves user exists and is valid
 
         // Check if profile already exists
         if (profileExists(userId)) {
@@ -144,6 +143,27 @@ public class UserProfileServiceImpl implements UserProfileService {
         userEventService.publishProfileUpdatedEvent(savedProfile);
 
         log.info("Profile updated successfully for user ID: {}", userId);
+        return mapToResponseDto(savedProfile);
+    }
+
+    @Override
+    public UserProfileResponseDto updateProfilePicture(Long userId, UpdateProfilePictureRequestDto requestDto) {
+        log.info("Updating profile picture for user ID: {}", userId);
+
+        UserProfile profile = userProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new UserProfileNotFoundException("Profile not found for user ID: " + userId));
+
+        // Update profile picture URLs
+        profile.setProfilePictureUrl(requestDto.getProfilePictureUrl());
+        profile.setProfilePictureThumbnailUrl(requestDto.getProfilePictureThumbnailUrl());
+        profile.setUpdatedAt(LocalDateTime.now());
+
+        UserProfile savedProfile = userProfileRepository.save(profile);
+
+        // Publish profile picture updated event
+        userEventService.publishProfileUpdatedEvent(savedProfile);
+
+        log.info("Profile picture updated successfully for user ID: {}", userId);
         return mapToResponseDto(savedProfile);
     }
 

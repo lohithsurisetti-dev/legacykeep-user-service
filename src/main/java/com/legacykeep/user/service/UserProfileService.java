@@ -1,5 +1,6 @@
 package com.legacykeep.user.service;
 
+import com.legacykeep.user.dto.request.UpdateProfilePictureRequestDto;
 import com.legacykeep.user.dto.request.UserProfileRequestDto;
 import com.legacykeep.user.dto.response.UserProfileResponseDto;
 import org.springframework.data.domain.Page;
@@ -51,6 +52,15 @@ public interface UserProfileService {
      * @return the updated profile response
      */
     UserProfileResponseDto updateProfile(Long userId, UserProfileRequestDto requestDto);
+
+    /**
+     * Update user profile picture.
+     * 
+     * @param userId the user ID
+     * @param requestDto the profile picture update request
+     * @return the updated profile response
+     */
+    UserProfileResponseDto updateProfilePicture(Long userId, UpdateProfilePictureRequestDto requestDto);
 
     /**
      * Delete user profile (soft delete).

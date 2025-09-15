@@ -67,5 +67,11 @@ public class UserProfileRequestDto {
     @Size(max = 10, message = "Language must not exceed 10 characters")
     private String language;
 
+    @Size(max = 500, message = "Profile picture URL must not exceed 500 characters")
+    private String profilePictureUrl;
+
+    @Size(max = 500, message = "Profile picture thumbnail URL must not exceed 500 characters")
+    private String profilePictureThumbnailUrl;
+
     private boolean isPublic = false;
 }

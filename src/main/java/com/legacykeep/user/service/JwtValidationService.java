@@ -54,8 +54,35 @@ public class JwtValidationService {
                 return Optional.empty();
             }
 
-            if (!jwtConfig.getAudience().equals(claims.getAudience())) {
-                log.warn("Invalid JWT audience: expected {}, got {}", jwtConfig.getAudience(), claims.getAudience());
+            // Handle audience validation - JWT audience can be a string or collection
+            Object audienceClaim = claims.getAudience();
+            boolean audienceValid = false;
+            
+            log.debug("JWT audience claim type: {}, value: {}", audienceClaim.getClass().getSimpleName(), audienceClaim);
+            
+            String expectedAudience = jwtConfig.getAudience();
+            
+            if (audienceClaim instanceof String) {
+                audienceValid = expectedAudience.equals(audienceClaim);
+                log.debug("String audience validation: {} == {} = {}", expectedAudience, audienceClaim, audienceValid);
+            } else if (audienceClaim instanceof java.util.Collection) {
+                @SuppressWarnings("unchecked")
+                java.util.Collection<String> audienceCollection = (java.util.Collection<String>) audienceClaim;
+                audienceValid = audienceCollection.contains(expectedAudience);
+                log.debug("Collection audience validation: {} contains {} = {}", audienceCollection, expectedAudience, audienceValid);
+            } else {
+                // For any other type, try to convert to string and compare
+                String audienceString = audienceClaim.toString();
+                // Remove brackets if it's a collection string representation like "[value]"
+                if (audienceString.startsWith("[") && audienceString.endsWith("]")) {
+                    audienceString = audienceString.substring(1, audienceString.length() - 1);
+                }
+                audienceValid = expectedAudience.equals(audienceString);
+                log.debug("String conversion audience validation: {} == {} = {}", expectedAudience, audienceString, audienceValid);
+            }
+            
+            if (!audienceValid) {
+                log.warn("Invalid JWT audience: expected {}, got {} (type: {})", expectedAudience, audienceClaim, audienceClaim.getClass().getSimpleName());
                 return Optional.empty();
             }
 

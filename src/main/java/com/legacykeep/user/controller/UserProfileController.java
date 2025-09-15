@@ -1,6 +1,7 @@
 package com.legacykeep.user.controller;
 
 import com.legacykeep.user.dto.ApiResponse;
+import com.legacykeep.user.dto.request.UpdateProfilePictureRequestDto;
 import com.legacykeep.user.dto.request.UserProfileRequestDto;
 import com.legacykeep.user.dto.response.UserProfileResponseDto;
 import com.legacykeep.user.service.JwtValidationService;
@@ -209,6 +210,22 @@ public class UserProfileController {
         int completion = userProfileService.getProfileCompletionPercentage(userId);
         
         return ResponseEntity.ok(ApiResponse.success(completion, "Profile completion retrieved successfully"));
+    }
+
+    /**
+     * Update profile picture.
+     */
+    @PutMapping("/me/picture")
+    @Operation(summary = "Update profile picture", description = "Update user's profile picture URL")
+    public ResponseEntity<ApiResponse<UserProfileResponseDto>> updateProfilePicture(
+            @RequestHeader("Authorization") String authHeader,
+            @Valid @RequestBody UpdateProfilePictureRequestDto requestDto) {
+        log.info("Updating profile picture");
+        
+        Long userId = extractUserIdFromToken(authHeader);
+        UserProfileResponseDto profile = userProfileService.updateProfilePicture(userId, requestDto);
+        
+        return ResponseEntity.ok(ApiResponse.success(profile, "Profile picture updated successfully"));
     }
 
     // =============================================================================
